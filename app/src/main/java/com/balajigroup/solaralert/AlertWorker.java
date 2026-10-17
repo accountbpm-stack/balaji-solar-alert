@@ -59,8 +59,26 @@ public class AlertWorker extends Worker {
                 if (!seen.contains(id)) fresh.put(a);
             }
             Prefs.setSeen(c, current);
+
+            // Daily reports (sent when all plants are entered for a day)
+            JSONArray reps = data.optJSONArray("reports");
+            JSONArray freshReps = new JSONArray();
+            Set<String> seenR = Prefs.seenReports(c);
+            Set<String> curR = new HashSet<>();
+            if (reps != null) {
+                for (int i = 0; i < reps.length(); i++) {
+                    JSONObject r = reps.getJSONObject(i);
+                    String id = r.optString("id");
+                    curR.add(id);
+                    if (!seenR.contains(id)) freshReps.put(r);
+                }
+            }
+            Prefs.setSeenReports(c, curR);
             Prefs.setStatus(c, "Last check: " + time + " · open alerts: " + all.length());
-            if (ring && fresh.length() > 0) AlarmNotifier.show(c, fresh, false);
+            if (ring) {
+                for (int i = 0; i < freshReps.length(); i++) AlarmNotifier.report(c, freshReps.getJSONObject(i));
+                if (fresh.length() > 0) AlarmNotifier.show(c, fresh, false);
+            }
             return true;
         } catch (Api.AuthException e) {
             Prefs.logout(c);

@@ -30,7 +30,7 @@ public final class Prefs {
     }
 
     public static void logout(Context c) {
-        sp(c).edit().remove("token").remove("seen").remove("name").remove("role").apply();
+        sp(c).edit().remove("token").remove("seen").remove("seenReports").remove("name").remove("role").apply();
     }
 
     public static String name(Context c) { return sp(c).getString("name", ""); }
@@ -43,6 +43,14 @@ public final class Prefs {
     }
     public static void setSeen(Context c, Set<String> ids) {
         sp(c).edit().putStringSet("seen", new HashSet<>(ids)).apply();
+    }
+
+    /** Daily report ids already shown on this phone. */
+    public static Set<String> seenReports(Context c) {
+        return new HashSet<>(sp(c).getStringSet("seenReports", new HashSet<>()));
+    }
+    public static void setSeenReports(Context c, Set<String> ids) {
+        sp(c).edit().putStringSet("seenReports", new HashSet<>(ids)).apply();
     }
 
     public static String status(Context c) { return sp(c).getString("status", "Not checked yet"); }

@@ -20,6 +20,7 @@ public final class AlarmNotifier {
 
     public static final String CH_ALARM = "solar_alarm_v1";
     public static final String CH_INFO = "solar_info";
+    public static final String CH_REPORT = "solar_daily_report";
     public static final int NID_ALARM = 4711;
     public static final int NID_INFO = 4712;
 
@@ -50,6 +51,11 @@ public final class AlarmNotifier {
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         ch.setBypassDnd(true);
         nm.createNotificationChannel(ch);
+
+        NotificationChannel rep = new NotificationChannel(CH_REPORT, "Daily report", NotificationManager.IMPORTANCE_HIGH);
+        rep.setDescription("Daily solar production report");
+        rep.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        nm.createNotificationChannel(rep);
 
         NotificationChannel info = new NotificationChannel(CH_INFO, "App messages", NotificationManager.IMPORTANCE_DEFAULT);
         nm.createNotificationChannel(info);
@@ -90,6 +96,65 @@ public final class AlarmNotifier {
                 .build();
         n.flags |= Notification.FLAG_INSISTENT; // keeps ringing until opened
         try { nm.notify(NID_ALARM, n); } catch (SecurityException ignored) { }
+    }
+
+    /** Daily report: normal notification (no siren). Tap opens the report screen. */
+    public static void report(Context c, JSONObject r) {
+        channels(c);
+        NotificationManager nm = c.getSystemService(NotificationManager.class);
+        if (nm == null) return;
+        StringBuilder lines = new StringBuilder();
+        StringBuilder shortTxt = new StringBuilder();
+        JSONArray ps = r.optJSONArray("plants");
+        if (ps != null) {
+            for (int i = 0; i < ps.length(); i++) {
+                JSONObject p = ps.optJSONObject(i);
+                String icon = statusIcon(p.optString("status"));
+                lines.append(icon).append(" ").append(p.optString("code")).append(": ").append(num(p.optDouble("kwh")))
+                        .append(" kWh (").append(p.optInt("pct")).append("% – ").append(p.optString("status")).append(")\n");
+                if (shortTxt.length() > 0) shortTxt.append(" · ");
+                shortTxt.append(p.optString("code")).append(" ").append(num(p.optDouble("kwh"))).append(" ").append(icon);
+            }
+        }
+        lines.append("Total: ").append(num(r.optDouble("totalKwh"))).append(" kWh");
+        int reqCode = Math.abs(r.optString("id").hashCode());
+        Intent i = new Intent(c, ReportActivity.class).putExtra("report", r.toString())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi = PendingIntent.getActivity(c, reqCode, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification n = new NotificationCompat.Builder(c, CH_REPORT)
+                .setSmallIcon(R.drawable.ic_stat_sun)
+                .setColor(0xFFF59E0B)
+                .setContentTitle("☀️ Daily Report – " + r.optString("dateText") + (r.optInt("version") > 1 ? " (updated)" : ""))
+                .setContentText(shortTxt.toString())
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(lines.toString()))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build();
+        try { nm.notify(5000 + (reqCode % 1000), n); } catch (SecurityException ignored) { }
+    }
+
+    public static String statusIcon(String status) {
+        switch (status) {
+            case "Normal": return "✅";
+            case "Slightly low": return "🟡";
+            case "Very low": return "🔴";
+            case "Weather": return "☁️";
+            case "Zero": return "⛔";
+            default: return "—";
+        }
+    }
+
+    public static int statusColor(String status) {
+        switch (status) {
+            case "Normal": return 0xFF067647;
+            case "Slightly low": return 0xFFB54708;
+            case "Weather": return 0xFF475F84;
+            case "Very low":
+            case "Zero": return 0xFFB42318;
+            default: return 0xFF666666;
+        }
     }
 
     public static void info(Context c, String title, String text) {
