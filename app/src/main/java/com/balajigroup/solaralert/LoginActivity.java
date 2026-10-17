@@ -99,6 +99,7 @@ public class LoginActivity extends Activity {
                         me != null ? me.optString("role") : "", data.optBoolean("canUpdate"));
                 AlertWorker.check(this, false);
                 AlertWorker.schedule(this);
+                Push.register(this);
 
                 ui.post(() -> {
                     startActivity(new Intent(this, MainActivity.class));

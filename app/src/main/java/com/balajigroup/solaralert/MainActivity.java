@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
         setTitle("☀️ Solar Monitor");
         AlarmNotifier.channels(this);
         AlertWorker.schedule(this);
+        Push.register(this);
 
         web = new WebView(this);
         setContentView(web);
@@ -180,8 +181,10 @@ public class MainActivity extends Activity {
                 return true;
             case M_STATUS:
                 new AlertDialog.Builder(this).setTitle("Alert status")
-                        .setMessage("Logged in as: " + Prefs.name(this) + "\n\n" + Prefs.status(this)
-                                + "\n\nThe app checks for new alerts every 15 minutes.")
+                        .setMessage("Logged in as: " + Prefs.name(this) + "\n\n"
+                                + (Prefs.pushReady(this) ? "⚡ Instant alerts: ON" : "Instant alerts: not active (Firebase not set up)")
+                                + "\n\n" + Prefs.status(this)
+                                + "\n\nBackup check every 15 minutes.")
                         .setPositiveButton("OK", null).show();
                 return true;
             case M_PERM:

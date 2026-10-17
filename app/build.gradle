@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+// Firebase (instant push) is switched on only when app/google-services.json is present
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 android {
     namespace 'com.balajigroup.solaralert'
     compileSdk 34
@@ -10,8 +15,8 @@ android {
         applicationId 'com.balajigroup.solaralert'
         minSdk 26
         targetSdk 34
-        versionCode 2
-        versionName '1.1'
+        versionCode 3
+        versionName '1.2'
     }
 
     signingConfigs {
@@ -48,4 +53,6 @@ dependencies {
     implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.work:work-runtime:2.9.1'
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
 }
