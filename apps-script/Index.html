@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solar Monitor – Balaji Group</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#ffffff; --surface-2:#faf9f6; --line:#e6e3dc; --line-2:#efede7;
+  --ink:#14213a; --ink-2:#4d5566; --ink-3:#7d8494;
+  --navy:#13233f; --navy-2:#1d3358; --sun:#f59e0b; --sun-soft:#fff4dc;
+  --bpi:#2a78d6; --sbp:#eb6834; --ly:#b9bcc4;
+  --good:#067647; --good-bg:#e7f6ee; --warn:#b54708; --warn-bg:#fdf1e3;
+  --bad:#b42318; --bad-bg:#fdecea; --wx:#475f84; --wx-bg:#e9eef6; --none:#f1efe9;
+  --r:12px; --shadow:0 1px 2px rgba(20,33,58,.06),0 4px 14px rgba(20,33,58,.05);
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+.hidden{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- login ---------- */
+#login{min-height:100vh;display:grid;place-items:center;padding:16px;
+  background:radial-gradient(1200px 500px at 80% -10%,#2a3f66 0,transparent 60%),var(--navy)}
+.login-card{width:100%;max-width:360px;background:var(--surface);border-radius:16px;padding:28px 24px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:38px;height:38px;border-radius:10px;background:var(--sun);display:grid;place-items:center;flex:none}
+.brand b{display:block;font-size:16px}
+.brand small{color:var(--ink-3);font-size:12px}
+.login-card .brand{margin-bottom:22px}
+label.f{display:block;font-size:12px;color:var(--ink-2);font-weight:600;margin:12px 0 5px}
+.in{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);outline:none;transition:border .15s}
+.in:focus{border-color:var(--sun);box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--sun);border-color:var(--sun);color:var(--navy)}
+.btn.primary:hover{filter:brightness(.96)}
+.btn.dark{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.block{width:100%}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:10px}
+
+/* ---------- shell ---------- */
+header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff}
+.top-in{max-width:1200px;margin:auto;display:flex;align-items:center;gap:16px;padding:10px 16px}
+.top .brand small{color:#a9b4c9}
+nav.tabs{display:flex;gap:2px;margin-left:12px}
+nav.tabs button{background:none;border:0;color:#c7cfdd;padding:9px 12px;border-radius:8px;cursor:pointer;font-weight:600;position:relative}
+nav.tabs button:hover{color:#fff;background:rgba(255,255,255,.06)}
+nav.tabs button.on{color:var(--navy);background:var(--sun)}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;margin-left:4px}
+.top .user{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:#c7cfdd}
+.top .user .chip{background:rgba(255,255,255,.08);padding:6px 10px;border-radius:20px;cursor:pointer;border:0;color:#fff}
+main{max-width:1200px;margin:auto;padding:18px 16px 90px}
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.page-h h1{font-size:20px}
+.page-h p{margin:3px 0 0;color:var(--ink-3);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.card h3 .sub{font-weight:400;color:var(--ink-3);font-size:12px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mt{margin-top:14px}
+
+/* KPI */
+.kpi{position:relative;overflow:hidden}
+.kpi .lbl{font-size:12px;color:var(--ink-3);font-weight:600;display:flex;align-items:center;gap:6px}
+.kpi .val{font-size:26px;font-weight:700;margin:6px 0 2px;letter-spacing:-.02em}
+.kpi .val small{font-size:13px;font-weight:600;color:var(--ink-3);margin-left:3px}
+.kpi .foot{font-size:12px;color:var(--ink-2)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.up{color:var(--good);font-weight:700}.down{color:var(--bad);font-weight:700}
+
+/* status pill */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.good{background:var(--good-bg);color:var(--good)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.wx{background:var(--wx-bg);color:var(--wx)}
+.pill.none{background:var(--none);color:var(--ink-3)}
+.pill.urgent{background:var(--bad);color:#fff}
+
+/* today banner */
+.today{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.today .msg{flex:1;min-width:220px}
+.today .msg b{font-size:15px}
+.today .msg div{color:var(--ink-2);font-size:13px;margin-top:3px}
+.today .plants{display:flex;gap:10px;flex-wrap:wrap}
+.tp{border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:150px;background:var(--surface-2)}
+.tp .n{font-size:12px;color:var(--ink-3);font-weight:600;display:flex;gap:6px;align-items:center}
+.tp .v{font-size:18px;font-weight:700;margin:2px 0}
+
+/* calendar */
+.cal-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.cal-h{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-bottom:8px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .wd{font-size:10px;color:var(--ink-3);text-align:center;font-weight:700;padding-bottom:2px}
+.cell{aspect-ratio:1/0.82;border-radius:7px;padding:4px 5px;font-size:10px;display:flex;flex-direction:column;justify-content:space-between;background:var(--none);color:var(--ink-3);cursor:default;position:relative;min-height:38px}
+.cell .d{font-weight:700}
+.cell .k{font-weight:700;font-size:11px;text-align:right}
+.cell.good{background:var(--good-bg);color:var(--good)}
+.cell.warn{background:var(--warn-bg);color:var(--warn)}
+.cell.bad{background:var(--bad);color:#fff}
+.cell.wx{background:var(--wx-bg);color:var(--wx)}
+.cell.empty{background:transparent}
+.cell.today{outline:2px solid var(--navy);outline-offset:-2px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.chart-box{position:relative;height:260px}
+.chart-box.sm{height:210px}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+table.t td{padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+table.t td.r,table.t th.r{text-align:right}
+table.t tr.tot td{font-weight:700;background:var(--surface-2)}
+table.t tbody tr:hover td{background:#fcfbf8}
+.click{cursor:pointer}
+
+/* entry */
+.entry-grid{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:12px}
+.ein{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)}
+.ein .h{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px}
+.ein .h small{font-weight:500;color:var(--ink-3)}
+.ein .row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.ein .row .in{font-size:20px;font-weight:700;padding:8px 10px}
+.ein .unit{color:var(--ink-3);font-weight:600}
+.ein .hint{font-size:12px;margin-top:6px;min-height:20px}
+.drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--ink-2);cursor:pointer;background:var(--surface-2)}
+.drop:hover{border-color:var(--sun)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* alerts */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:20px;cursor:pointer;font-weight:600;font-size:13px}
+.chips button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.al{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:14px 0;border-bottom:1px solid var(--line-2)}
+.al:last-child{border-bottom:0}
+.al .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px}
+.al .ttl{font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.al .meta{color:var(--ink-2);font-size:13px;margin-top:3px}
+.al .act{font-size:13px;margin-top:5px}
+.al .rm{font-size:12px;color:var(--ink-3);margin-top:4px}
+.al .ctl{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.al .ctl .in{padding:6px 8px;font-size:13px;width:auto}
+.al .ctl input.in{min-width:180px;flex:1}
+.empty-s{padding:30px;text-align:center;color:var(--ink-3)}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;transition:.25s;z-index:99;max-width:90vw;text-align:center;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--bad)}
+#loader{position:fixed;inset:0;background:rgba(244,243,239,.6);display:grid;place-items:center;z-index:90}
+.spin{width:34px;height:34px;border:3px solid #e2ddd2;border-top-color:var(--sun);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.modal{position:fixed;inset:0;background:rgba(10,18,34,.5);display:grid;place-items:center;z-index:95;padding:16px}
+.modal .card{width:100%;max-width:380px;max-height:90vh;overflow:auto}
+.rep-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.rep-h span{display:block;color:var(--ink-3);font-size:13px;margin-top:2px}
+.rep-tot{text-align:right;font-size:13px;color:var(--ink-2)} .rep-tot b{font-size:22px;color:var(--ink)} .rep-tot span{display:block;color:var(--ink-3);font-size:12px}
+.rep-p{padding:10px 0;border-bottom:1px solid var(--line-2)} .rep-p small{color:var(--ink-3)}
+.rep-v{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px} .rep-v b{font-size:18px}
+.rep-m{font-size:12px;color:var(--ink-2);margin-top:6px}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+
+/* mobile bottom nav */
+nav.bottom{display:none}
+@media (max-width:860px){
+  nav.tabs{display:none}
+  nav.bottom{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  nav.bottom button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--ink-3);padding:4px 0;position:relative;cursor:pointer}
+  nav.bottom button svg{width:22px;height:22px}
+  nav.bottom button.on{color:var(--navy)}
+  nav.bottom button.on svg{color:var(--sun)}
+  nav.bottom .badge{position:absolute;top:0;left:55%}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3,.g2,.cal-wrap{grid-template-columns:1fr}
+  .top .user .nm{display:none}
+  .kpi .val{font-size:22px}
+}
+@media (max-width:420px){
+  .entry-grid{grid-template-columns:1fr}
+  .cell{min-height:34px;padding:3px}
+  .cell .k{font-size:10px}
+}
+@media print{
+  header.top,nav.bottom,.noprint,#toast{display:none!important}
+  body{background:#fff}
+  main{padding:0;max-width:none}
+  .card{box-shadow:none;break-inside:avoid}
+  section.page{display:none!important}
+  section.page.printme{display:block!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login" class="hidden">
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="brand">
+      <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#13233f" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></div>
+      <div><b>Solar Monitor</b><small class="cname">Balaji Group</small></div>
+    </div>
+    <label class="f">Username</label>
+    <input class="in" id="lu" autocomplete="username" required>
+    <label class="f">Password</label>
+    <input class="in" id="lp" type="password" autocomplete="current-password" required>
+    <button class="btn primary block" style="margin-top:18px" id="lbtn">Login</button>
+    <div class="err" id="lerr"></div>
+  </form>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#13233f" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></div>
+        <div><b>Solar Monitor</b><small class="cname">Balaji Group</small></div>
+      </div>
+      <nav class="tabs" id="tabs"></nav>
+      <div class="user"><span class="nm" id="uname"></span><button class="chip" id="umenu">⋯</button></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section class="page" id="p-dash">
+      <div class="page-h">
+        <div><h1>Dashboard</h1><p id="dashSub"></p></div>
+        <div class="toolbar"><input type="month" class="in" id="dMonth" style="width:auto"></div>
+      </div>
+      <div id="sheetWarn"></div>
+      <div class="card today" id="todayCard"></div>
+      <div class="grid g4 mt" id="kpis"></div>
+      <div class="card mt">
+        <h3>Daily calendar <span class="sub">each day vs normal</span></h3>
+        <div class="cal-wrap" id="cals"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--good-bg);border:1px solid var(--good)"></i>✓ Normal</span>
+          <span><i class="sw" style="background:var(--warn-bg);border:1px solid var(--warn)"></i>! Slightly low</span>
+          <span><i class="sw" style="background:var(--bad)"></i>✕ Very low – check plant</span>
+          <span><i class="sw" style="background:var(--wx-bg);border:1px solid var(--wx)"></i>☁ All plants low – weather</span>
+          <span><i class="sw" style="background:var(--none)"></i>No entry</span>
+        </div>
+      </div>
+      <div class="card mt">
+        <h3>% of normal – daily <span class="sub">both lines drop together = weather · only one drops = plant issue</span></h3>
+        <div class="chart-box"><canvas id="cPct"></canvas></div>
+      </div>
+      <div class="grid g2 mt" id="yoyWrap"></div>
+    </section>
+
+    <!-- ENTRY -->
+    <section class="page hidden" id="p-entry">
+      <div class="page-h"><div><h1>Daily Entry</h1><p>Enter daily production (kWh) from SOLARMAN – saved directly to your report sheet</p></div></div>
+      <div class="card">
+        <div class="toolbar" style="margin-bottom:12px">
+          <label class="f" style="margin:0">Date</label>
+          <input type="date" class="in" id="eDate" style="width:auto">
+          <button class="btn sm" id="ePrev">‹ Previous day</button>
+          <button class="btn sm" id="eNext">Next day ›</button>
+        </div>
+        <div class="entry-grid" id="eInputs"></div>
+        <div class="toolbar mt"><button class="btn primary" id="eSave">Save entry</button><span id="eNote" style="color:var(--ink-3);font-size:12px"></span></div>
+      </div>
+
+      <div class="card mt">
+        <h3>SOLARMAN export upload <span class="sub">enter a full month at once</span></h3>
+        <div class="toolbar" style="margin-bottom:10px">
+          <label class="f" style="margin:0">Plant</label>
+          <select class="in" id="uPlant" style="width:auto"></select>
+        </div>
+        <label class="drop" id="uDrop"><input type="file" id="uFile" accept=".xlsx,.xls,.csv" hidden>
+          <b>Choose Excel / CSV file</b><br><small>Portal → Export → Daily data (Month/Year)</small></label>
+        <div id="uPreview"></div>
+      </div>
+
+      <div class="card mt">
+        <h3>Recent entries <span class="sub">click a row to edit</span></h3>
+        <div class="tbl-wrap"><table class="t" id="recent"></table></div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="page hidden" id="p-alerts">
+      <div class="page-h">
+        <div><h1>Alerts</h1><p>Low production days – update the check status here</p></div>
+        <div class="chips" id="aFilter"></div>
+      </div>
+      <div class="card" id="aList"></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="page hidden" id="p-reports">
+      <div class="page-h">
+        <div><h1>Reports</h1><p>Monthly / yearly production (MWh) – in your report format</p></div>
+        <div class="toolbar noprint">
+          <select class="in" id="rYear" style="width:auto"></select>
+          <button class="btn" id="rXls">⬇ Excel</button>
+          <button class="btn" id="rPrint">🖨 Print / PDF</button>
+          <span class="toolbar" id="rMailBox"><input type="month" class="in" id="rMonth" style="width:auto"><button class="btn dark" id="rMail">✉ Email monthly report</button></span>
+        </div>
+      </div>
+      <div class="card" id="rSummary"></div>
+      <div id="rPlants"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page hidden" id="p-settings">
+      <div class="page-h"><div><h1>Settings</h1><p>Admin only</p></div></div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Report sheet <span class="sub">where daily production is read from / written to</span></h3>
+        <div id="sLinked" style="font-size:13px;margin-bottom:10px"></div>
+        <label class="f">Report Google Sheet URL (only if the tool is not reading the right sheet)</label>
+        <div class="toolbar"><input class="in" id="sSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="flex:1;min-width:220px"><button class="btn dark" id="sLink">Link sheet</button></div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <h3>Alert settings</h3>
+          <label class="f">Company name</label><input class="in" id="sCompany">
+          <div class="grid g2">
+            <div><label class="f">Alert when production is below normal by (%)</label><input class="in" type="number" id="sTh" min="10" max="90"></div>
+            <div><label class="f">Consecutive low days = URGENT</label><input class="in" type="number" id="sUrg" min="1" max="7"></div>
+          </div>
+          <label class="f">Boss email(s) – alerts + monthly report</label><input class="in" id="sBoss" placeholder="boss@gmail.com, owner@gmail.com">
+          <label class="f">Entry reminder email (yours)</label><input class="in" id="sRem">
+          <div class="grid g2">
+            <div><label class="f">Daily check time (24h)</label><input class="in" type="number" id="sHour" min="0" max="23"></div>
+            <div><label class="f">Alert even when all plants are low (weather)?</label><select class="in" id="sWx"><option value="false">No</option><option value="true">Yes</option></select></div>
+          </div>
+          <label class="f">Send daily report (email + Telegram + app) as soon as all plants are entered for a day?</label><select class="in" id="sRep"><option value="true">Yes</option><option value="false">No</option></select>
+          <label class="f">Telegram bot token (optional)</label><input class="in" id="sTgT">
+          <label class="f">Telegram chat ID (optional)</label><input class="in" id="sTgC">
+          <label class="f">Firebase project ID – instant alerts on the mobile app (optional)</label><input class="in" id="sFcm" placeholder="e.g. balaji-solar-alert">
+        </div>
+        <div class="card">
+          <h3>Plants <span class="sub">capacity and sheet tab names</span></h3>
+          <div id="sPlants"></div>
+          <button class="btn sm mt" id="sAddPlant">+ Add plant</button>
+        </div>
+      </div>
+      <div class="toolbar mt"><button class="btn primary" id="sSave">Save settings</button>
+        <button class="btn" id="sTest">Send test email / Telegram</button>
+        <button class="btn" id="sPush">Send test alarm to phones</button>
+        <button class="btn" id="sTrig">Reset daily trigger</button>
+        <button class="btn" id="sRebuild">Build alerts for last 60 days</button></div>
+
+      <div class="card mt">
+        <h3>Users <span class="sub">admin = everything · staff = entry · boss = view + alert status</span></h3>
+        <div class="tbl-wrap"><table class="t" id="uTable"></table></div>
+        <div class="grid g4 mt" style="align-items:end">
+          <div><label class="f">Username</label><input class="in" id="nuU"></div>
+          <div><label class="f">Name</label><input class="in" id="nuN"></div>
+          <div><label class="f">Role</label><select class="in" id="nuR"><option value="staff">staff</option><option value="boss">boss</option><option value="admin">admin</option></select></div>
+          <div><label class="f">Password</label><input class="in" id="nuP" placeholder="(blank = keep same)"></div>
+        </div>
+        <div class="toolbar mt"><button class="btn dark" id="nuSave">Save user</button></div>
+      </div>
+      <div class="card mt">
+        <h3>App link <span class="sub">open on phone → Chrome menu ⋮ → Add to Home screen</span></h3>
+        <div class="toolbar"><input class="in" id="sUrl" readonly style="flex:1;min-width:220px"><button class="btn" id="sCopy">Copy</button></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom" id="bnav"></nav>
+</div>
+
+<div id="toast"></div>
+<div id="loader" class="hidden"><div class="spin"></div></div>
+
+<script>
+/* =================== CORE =================== */
+const $ = s => document.querySelector(s);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COLORS = ['#2a78d6','#eb6834','#1baf7a','#4a3aa7'];
+let TOKEN = null, S = null, page = 'dash', charts = {}, aFilter = 'open';
+const store = { get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}, del(k){try{localStorage.removeItem(k)}catch(e){}} };
+
+function call(action, payload){
+  return new Promise((res, rej) => {
+    google.script.run
+      .withSuccessHandler(r => {
+        if (r && r.ok) return res(r.data);
+        const m = r ? r.error : 'Server error';
+        if (m === 'AUTH') { doLogout(true); return rej(new Error('Session expired – please log in again')); }
+        rej(new Error(m));
+      })
+      .withFailureHandler(e => rej(new Error(e && e.message || 'Network error')))
+      .api(action, payload || {}, TOKEN);
+  });
+}
+function busy(on){ $('#loader').classList.toggle('hidden', !on); }
+let tt; function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className=(err?'err ':'')+'show'; clearTimeout(tt); tt=setTimeout(()=>t.className='',3200); }
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => (n<10?'0':'')+n;
+const addDays = (k,n) => { const d=new Date(Date.UTC(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8,10)+n)); return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate()); };
+const dim = (y,m) => new Date(Date.UTC(y,m,0)).getUTCDate();
+const fd = k => k.slice(8,10)+' '+MON[+k.slice(5,7)-1]+' '+k.slice(0,4);
+const fds = k => k.slice(8,10)+' '+MON[+k.slice(5,7)-1];
+const monName = m => MON[+m.slice(5,7)-1]+' '+m.slice(0,4);
+const fmt = (v,d=1) => v==null||isNaN(v) ? '—' : Number(v).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const can = (...r) => S && r.includes(S.user.role);
+const plants = () => S.settings.plants;
+const pColor = code => COLORS[Math.max(0, plants().findIndex(p=>p.code===code)) % COLORS.length];
+
+/* =================== LOGIC (same as server) =================== */
+function median(a){ if(!a.length) return 0; const s=a.slice().sort((x,y)=>x-y), h=Math.floor(s.length/2); return s.length%2?s[h]:(s[h-1]+s[h])/2; }
+function computeNormals(){
+  const N={};
+  plants().forEach(p=>{ N[p.code]={}; const by={};
+    Object.entries(S.data[p.code]||{}).forEach(([k,v])=>{ if(v>0) (by[k.slice(5,7)]=by[k.slice(5,7)]||[]).push(v); });
+    for(let m=1;m<=12;m++){ const a=by[pad(m)]||[]; N[p.code][pad(m)] = a.length>=8 ? Math.round(median(a)*10)/10 : Math.round(p.capacityKw*3); }
+  });
+  S.N=N;
+}
+const normalOf = (code, k) => S.N[code][k.slice(5,7)];
+const isLow = (v,n) => v!=null && v < n*(1-S.settings.thresholdPct/100);
+/** status of a plant on a date: good | warn | bad | wx | none */
+function statusOf(code, k){
+  const v=S.data[code][k]; if(v==null) return 'none';
+  const n=normalOf(code,k);
+  if(isLow(v,n)){
+    const all = plants().length>1 && plants().every(p=>isLow(S.data[p.code][k], normalOf(p.code,k)));
+    return v>0 && all ? 'wx' : 'bad';
+  }
+  if(v < n*0.8) return 'warn';
+  return 'good';
+}
+const ST = { good:['good','✓ Normal'], warn:['warn','! Slightly low'], bad:['bad','✕ Very low'], wx:['wx','☁ Weather'], none:['none','— No entry'] };
+const pill = st => `<span class="pill ${ST[st][0]}">${ST[st][1]}</span>`;
+const pctOf = (code,k) => { const v=S.data[code][k]; return v==null?null:Math.round(v/normalOf(code,k)*100); };
+
+/* =================== AUTH =================== */
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault(); $('#lerr').textContent=''; $('#lbtn').disabled=true;
+  try { const r = await call('login',{username:$('#lu').value,password:$('#lp').value}); TOKEN=r.token; store.set('spm_token',TOKEN); await boot(); }
+  catch(err){ $('#lerr').textContent=err.message; }
+  $('#lbtn').disabled=false;
+});
+function doLogout(silent){
+  if(!silent && TOKEN) call('logout').catch(()=>{});
+  TOKEN=null; store.del('spm_token'); S=null;
+  $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
+}
+async function boot(){
+  busy(true);
+  try{
+    S = await call('bootstrap');
+    computeNormals();
+    $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+    document.querySelectorAll('.cname').forEach(e=>e.textContent=S.settings.companyName||'Balaji Group');
+    $('#uname').textContent = S.user.name+' · '+S.user.role;
+    buildNav();
+    if(!$('#dMonth').value) $('#dMonth').value = S.today.slice(0,7);
+    if(!$('#eDate').value) $('#eDate').value = S.today;
+    go(page);
+  } catch(e){ if(TOKEN) toast(e.message,true); $('#login').classList.remove('hidden'); }
+  busy(false);
+}
+
+/* =================== NAV =================== */
+const ICON = {
+  dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  entry:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  alerts:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>',
+  reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>'
+};
+function navItems(){
+  const it=[['dash','Dashboard']];
+  if(can('admin','staff')) it.push(['entry','Entry']);
+  it.push(['alerts','Alerts'],['reports','Reports']);
+  if(can('admin')) it.push(['settings','Settings']);
+  return it;
+}
+function openAlerts(){ return S.alerts.filter(a=>a.status==='Open' && a.type!=='WEATHER' && a.type!=='CLEARED').length; }
+function buildNav(){
+  const n=openAlerts();
+  const b = id => id==='alerts' && n ? `<span class="badge">${n}</span>` : '';
+  $('#tabs').innerHTML = navItems().map(([id,l])=>`<button data-p="${id}" class="${id===page?'on':''}">${l}${b(id)}</button>`).join('');
+  $('#bnav').innerHTML = navItems().map(([id,l])=>`<button data-p="${id}" class="${id===page?'on':''}">${ICON[id]}${l}${b(id)}</button>`).join('');
+  document.querySelectorAll('[data-p]').forEach(x=>x.onclick=()=>go(x.dataset.p));
+}
+function go(p){
+  if(!navItems().some(x=>x[0]===p)) p='dash';
+  page=p;
+  document.querySelectorAll('section.page').forEach(s=>s.classList.toggle('hidden', s.id!=='p-'+p));
+  buildNav();
+  ({dash:renderDash, entry:renderEntry, alerts:renderAlerts, reports:renderReports, settings:renderSettings})[p]();
+  window.scrollTo(0,0);
+}
+$('#umenu').onclick = () => {
+  const m=document.createElement('div'); m.className='modal';
+  m.innerHTML=`<div class="card"><h3>${esc(S.user.name)} <span class="sub">${S.user.role}</span></h3>
+    <label class="f">Current password</label><input class="in" type="password" id="cpO">
+    <label class="f">New password</label><input class="in" type="password" id="cpN">
+    <div class="toolbar mt"><button class="btn primary" id="cpS">Change password</button><button class="btn" id="cpX">Close</button></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="toolbar"><button class="btn" id="cpR">↻ Refresh data</button><button class="btn" id="cpL" style="color:var(--bad)">Logout</button></div></div>`;
+  document.body.appendChild(m);
+  const close=()=>m.remove();
+  m.onclick=e=>{ if(e.target===m) close(); };
+  $('#cpX').onclick=close;
+  $('#cpL').onclick=()=>{ close(); doLogout(); };
+  $('#cpR').onclick=()=>{ close(); boot(); };
+  $('#cpS').onclick=async()=>{ busy(true); try{ await call('changePassword',{oldPassword:$('#cpO').value,newPassword:$('#cpN').value}); toast('Password changed'); close(); }catch(e){toast(e.message,true);} busy(false); };
+};
+
+/* =================== DASHBOARD =================== */
+$('#dMonth').onchange = () => renderDash();
+function sumMonth(code, m){ let t=0,n=0; Object.entries(S.data[code]).forEach(([k,v])=>{ if(k.slice(0,7)===m){t+=v;n++;} }); return {t,n}; }
+function latestDate(){ let best=null; plants().forEach(p=>Object.keys(S.data[p.code]).forEach(k=>{ if(!best||k>best) best=k; })); return best; }
+
+function renderDash(){
+  const m=$('#dMonth').value || S.today.slice(0,7);
+  const ly=(+m.slice(0,4)-1)+m.slice(4);
+  $('#dashSub').textContent = monName(m)+' · alert when '+S.settings.thresholdPct+'% below normal';
+  const bad=(S.plantStatus||[]).filter(x=>!x.sheet || !x.years.length);
+  $('#sheetWarn').innerHTML = bad.length ? `<div class="warnbox">⚠ Report sheet problem in <b>${esc(S.spreadsheetName||'')}</b>: no daily data tab found for <b>${bad.map(x=>esc(x.code)).join(', ')}</b> (looking for year blocks like "${esc(bad[0].code)} -2026"). ${can('admin')?'Go to <a href="#" onclick="go(\'settings\');return false">Settings → Report sheet</a> to link the correct Google Sheet or fix the tab name.':'Please ask the admin to fix it.'}</div>`:'';
+
+  // Today / latest card
+  const L = latestDate();
+  if(!L){ $('#todayCard').innerHTML='<div class="msg"><b>No data yet</b><div>Make the first entry from the Entry tab.</div></div>'; }
+  else{
+    const sts = plants().map(p=>statusOf(p.code,L));
+    let head, sub, ic;
+    if(sts.includes('bad')){ const bad=plants().filter((p,i)=>sts[i]==='bad').map(p=>p.code); head=`${bad.join(', ')} production is very low`; sub='Get the plant checked (inverter / tripping / panel cleaning).'; ic='bad'; }
+    else if(sts.includes('wx')){ head='All plants low – weather'; sub='All plants dropped together, most likely clouds/rain. No check needed.'; ic='wx'; }
+    else if(sts.includes('none')){ head='Entry pending for some plants'; sub='Enter the remaining plant values from the Entry tab.'; ic='none'; }
+    else if(sts.includes('warn')){ head='Production slightly low'; sub='Below normal but within the alert limit.'; ic='warn'; }
+    else { head='All plants running normally'; sub='No action needed.'; ic='good'; }
+    $('#todayCard').innerHTML = `<div class="msg"><span class="pill ${ST[ic][0]}" style="margin-bottom:6px">${L===S.today?'Today':'Last entry'} · ${fd(L)}</span><br><b>${esc(head)}</b><div>${esc(sub)}</div></div>
+      <div class="plants">${plants().map((p,i)=>`<div class="tp"><div class="n"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.code)}</div>
+      <div class="v num">${fmt(S.data[p.code][L],1)} <small style="font-size:12px;color:var(--ink-3)">kWh</small></div>
+      <div style="font-size:12px;color:var(--ink-3)">normal ~${fmt(normalOf(p.code,L),0)} · ${pctOf(p.code,L)??'—'}%</div></div>`).join('')}</div>`;
+  }
+
+  // KPIs
+  let kp='';
+  plants().forEach(p=>{
+    const a=sumMonth(p.code,m);
+    const lastD=Object.keys(S.data[p.code]).filter(k=>k.slice(0,7)===m).reduce((x,k)=>Math.max(x,+k.slice(8,10)),0);
+    const full = lastD>=dim(+m.slice(0,4),+m.slice(5,7));
+    const b={t:0,n:0}; Object.entries(S.data[p.code]).forEach(([k,v])=>{ if(k.slice(0,7)===ly && +k.slice(8,10)<=lastD){ b.t+=v; b.n++; } });
+    const ch = b.t && a.n ? Math.round((a.t/b.t-1)*100) : null;
+    const avg = a.n ? a.t/a.n : null;
+    kp+=`<div class="card kpi"><div class="lbl"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.code)} · ${monName(m)}</div>
+      <div class="val num">${fmt(a.t/1000,2)}<small>MWh</small></div>
+      <div class="foot">${ch===null?'No data for last year':`<span class="${ch<0?'down':'up'}">${ch>0?'▲ +':'▼ '}${ch}%</span> vs ${monName(ly)}${full?'':' (days 1-'+lastD+')'} · ${fmt(b.t/1000,2)}`}<br>
+      Avg ${fmt(avg,0)} kWh/day · normal ~${fmt(S.N[p.code][m.slice(5,7)],0)}</div></div>`;
+  });
+  const oa=openAlerts();
+  const monthLow = S.alerts.filter(a=>a.date.slice(0,7)===m && (a.type==='PLANT'||a.type==='DOWN'||a.type==='PENDING')).length;
+  kp+=`<div class="card kpi click" onclick="go('alerts')"><div class="lbl">🔔 Open alerts</div><div class="val num" style="color:${oa?'var(--bad)':'var(--good)'}">${oa}</div><div class="foot">${monthLow} plant-issue days in ${monName(m)}<br>Tap to view</div></div>`;
+  const yr=m.slice(0,4);
+  const ytd = plants().reduce((s,p)=>s+Object.entries(S.data[p.code]).filter(([k])=>k.slice(0,4)===yr).reduce((a,[,v])=>a+v,0),0);
+  kp+=`<div class="card kpi"><div class="lbl">☀️ ${yr} total (all plants)</div><div class="val num">${fmt(ytd/1000,1)}<small>MWh</small></div><div class="foot">${plants().map(p=>esc(p.code)+' '+p.capacityKw+' kW').join(' · ')}</div></div>`;
+  $('#kpis').innerHTML=kp;
+
+  // calendars
+  const y=+m.slice(0,4), mo=+m.slice(5,7), n=dim(y,mo);
+  const first=(new Date(Date.UTC(y,mo-1,1)).getUTCDay()+6)%7; // Mon first
+  $('#cals').innerHTML = plants().map(p=>{
+    let h=`<div><div class="cal-h"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.name)} <span style="color:var(--ink-3);font-weight:500">(${esc(p.code)})</span></div><div class="cal">`;
+    h+=['M','T','W','T','F','S','S'].map(d=>`<div class="wd">${d}</div>`).join('');
+    for(let i=0;i<first;i++) h+='<div class="cell empty"></div>';
+    for(let d=1;d<=n;d++){
+      const k=m+'-'+pad(d), v=S.data[p.code][k], st=k>S.today?'none':statusOf(p.code,k);
+      const ic={good:'',warn:'!',bad:'✕',wx:'☁',none:''}[st];
+      const tip = v==null ? `${fd(k)} – no entry` : `${fd(k)}: ${fmt(v)} kWh (normal ~${fmt(normalOf(p.code,k),0)}, ${pctOf(p.code,k)}%)`;
+      h+=`<div class="cell ${st==='none'?'':st} ${k===S.today?'today':''}" title="${tip}"><span class="d">${d} ${ic}</span><span class="k num">${v==null?'':Math.round(v)}</span></div>`;
+    }
+    return h+'</div></div>';
+  }).join('');
+
+  // % of normal chart
+  const labels=[], sets=plants().map(p=>({label:p.code, data:[], borderColor:pColor(p.code), backgroundColor:pColor(p.code), borderWidth:2, pointRadius:3, pointHoverRadius:6, tension:.25, spanGaps:false}));
+  for(let d=1;d<=n;d++){ const k=m+'-'+pad(d); labels.push(d); plants().forEach((p,i)=>sets[i].data.push(k>S.today?null:pctOf(p.code,k))); }
+  const th=100-S.settings.thresholdPct;
+  sets.push({label:'Alert limit ('+th+'%)', data:labels.map(()=>th), borderColor:'#b42318', borderDash:[5,4], borderWidth:1.5, pointRadius:0, pointHoverRadius:0});
+  drawChart('cPct',{type:'line',data:{labels,datasets:sets},options:baseOpts({y:{suggestedMin:0,suggestedMax:130,ticks:{callback:v=>v+'%'}},x:{title:{display:true,text:monName(m)+' – day'}}},
+    {tooltip:{callbacks:{title:it=>fd(m+'-'+pad(it[0].label)), label:c=>{ if(c.dataset.label.startsWith('Alert')) return ' Alert limit '+th+'%'; const k=m+'-'+pad(c.label); return ` ${c.dataset.label}: ${c.parsed.y}% (${fmt(S.data[c.dataset.label][k])} kWh)`; }}}})});
+
+  // YoY small multiples
+  $('#yoyWrap').innerHTML = plants().map(p=>`<div class="card"><h3><span style="display:flex;gap:6px;align-items:center"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.code)} – monthly MWh</span><span class="sub">${y} vs ${y-1}</span></h3><div class="chart-box sm"><canvas id="cy_${p.code}"></canvas></div></div>`).join('');
+  plants().forEach(p=>{
+    const cur=[],prev=[];
+    for(let i=1;i<=12;i++){ const a=sumMonth(p.code,y+'-'+pad(i)), b=sumMonth(p.code,(y-1)+'-'+pad(i)); cur.push(a.n?+(a.t/1000).toFixed(2):null); prev.push(b.n?+(b.t/1000).toFixed(2):null); }
+    drawChart('cy_'+p.code,{type:'bar',data:{labels:MON,datasets:[
+      {label:String(y-1),data:prev,backgroundColor:'#c9ccd3',borderRadius:4,maxBarThickness:14},
+      {label:String(y),data:cur,backgroundColor:pColor(p.code),borderRadius:4,maxBarThickness:14}]},
+      options:baseOpts({y:{beginAtZero:true,ticks:{callback:v=>v}}},{tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,2)} MWh`}}})});
+  });
+}
+function baseOpts(scales, plugins){
+  const grid={color:'#eeece6'}, tick={color:'#7d8494',font:{size:11}};
+  const sc={x:{grid:{display:false},ticks:tick,border:{color:'#e6e3dc'}}, y:{grid, ticks:tick, border:{display:false}}};
+  Object.keys(scales||{}).forEach(k=>{ sc[k]=Object.assign(sc[k]||{},scales[k]); sc[k].ticks=Object.assign({},tick,scales[k].ticks||{}); if(scales[k].title) sc[k].title=Object.assign({color:'#7d8494',font:{size:11}},scales[k].title); });
+  return {responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:Object.assign({legend:{position:'top',align:'end',labels:{boxWidth:10,boxHeight:10,usePointStyle:true,color:'#4d5566',font:{size:12}}},
+      tooltip:{backgroundColor:'#13233f',padding:10,cornerRadius:8,titleFont:{weight:'700'}}},plugins||{}), scales:sc};
+}
+function drawChart(id,cfg){ if(charts[id]) charts[id].destroy(); const el=document.getElementById(id); if(el && window.Chart) charts[id]=new Chart(el,cfg); }
+
+/* =================== ENTRY =================== */
+function renderEntry(){
+  const k=$('#eDate').value||S.today;
+  $('#eDate').max=S.today;
+  $('#eInputs').style.setProperty('--n', Math.min(plants().length,3));
+  $('#eInputs').innerHTML = plants().map(p=>`<div class="ein"><div class="h"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.code)} <small>${esc(p.name)} · ${p.capacityKw} kW</small></div>
+    <div class="row"><input class="in num" type="number" step="0.1" min="0" inputmode="decimal" data-plant="${p.code}" value="${S.data[p.code][k]??''}" placeholder="0.0"><span class="unit">kWh</span></div>
+    <div class="hint" id="h_${p.code}"></div></div>`).join('');
+  document.querySelectorAll('#eInputs input').forEach(i=>{ i.oninput=liveHints; i.onkeydown=e=>{ if(e.key==='Enter') saveEntry(); }; });
+  liveHints();
+  const has = plants().some(p=>S.data[p.code][k]!=null);
+  $('#eNote').textContent = has ? 'Entry already exists for this date – saving will update it' : '';
+  $('#uPlant').innerHTML = plants().map(p=>`<option value="${p.code}">${esc(p.code)} – ${esc(p.name)}</option>`).join('');
+  renderRecent();
+}
+function liveHints(){
+  const k=$('#eDate').value||S.today;
+  const vals={}; document.querySelectorAll('#eInputs input').forEach(i=>vals[i.dataset.plant]=i.value===''?null:+i.value);
+  const lows=plants().filter(p=>isLow(vals[p.code],normalOf(p.code,k)));
+  plants().forEach(p=>{
+    const v=vals[p.code], n=normalOf(p.code,k), el=$('#h_'+p.code);
+    if(v==null){ el.innerHTML=`<span style="color:var(--ink-3)">Normal ~${fmt(n,0)} kWh (${MON[+k.slice(5,7)-1]})</span>`; return; }
+    const pc=Math.round(v/n*100);
+    let st = isLow(v,n) ? (v>0 && plants().length>1 && lows.length===plants().length ? 'wx':'bad') : (v<n*0.8?'warn':'good');
+    if(v>p.capacityKw*14) { el.innerHTML='<span class="pill bad">Value higher than plant capacity – check</span>'; return; }
+    el.innerHTML=`${pill(st)} <span style="color:var(--ink-2)">${pc}% of normal (~${fmt(n,0)})</span>`;
+  });
+}
+$('#eDate').onchange=()=>renderEntry();
+$('#ePrev').onclick=()=>{ $('#eDate').value=addDays($('#eDate').value||S.today,-1); renderEntry(); };
+$('#eNext').onclick=()=>{ const n=addDays($('#eDate').value||S.today,1); if(n<=S.today){ $('#eDate').value=n; renderEntry(); } };
+$('#eSave').onclick=saveEntry;
+async function saveEntry(){
+  const k=$('#eDate').value;
+  if(!k || k>S.today) return toast('Choose a valid date',true);
+  const rows=[]; document.querySelectorAll('#eInputs input').forEach(i=>{ const old=S.data[i.dataset.plant][k]; const nv=i.value===''?null:Math.round(+i.value*10)/10; if(nv!==(old??null)) rows.push({date:k,plant:i.dataset.plant,kwh:nv}); });
+  if(!rows.length) return toast('Nothing changed');
+  await saveRows(rows,'manual');
+}
+async function saveRows(rows, source){
+  busy(true);
+  try{
+    const r=await call('saveEntries',{rows,source});
+    S.data=r.data; S.alerts=r.alerts; computeNormals(); buildNav();
+    toast(`${r.saved} entr${r.saved>1?'ies':'y'} saved`+(r.notified?` · ${r.notified} alert sent to boss`:''));
+    if(page==='entry') renderEntry();
+    if(r.reports && r.reports.length) showReports(r.reports);
+    else if(S.settings.dailyReport!==false){
+      const d=[...new Set(rows.map(x=>x.date))].sort().pop();
+      const miss=plants().filter(p=>S.data[p.code][d]==null).map(p=>p.code);
+      if(miss.length && d>=addDays(S.today,-3)) setTimeout(()=>toast(`Daily report for ${fds(d)} will be sent after ${miss.join(', ')} is entered`),3400);
+    }
+  }catch(e){ toast(e.message,true); }
+  busy(false);
+}
+/* ---- Daily report (shown after saving a complete day) ---- */
+const RST={'Normal':'good','Slightly low':'warn','Very low':'bad','Weather':'wx','Zero':'bad','No entry':'none'};
+function reportHtml(r){
+  return `<div class="rep"><div class="rep-h"><div><b>☀️ Daily Report</b><span>${esc(r.dateText)}${r.version>1?' · updated':''}</span></div><div class="rep-tot"><b>${fmt(r.totalKwh,1)}</b> kWh${r.totalPct!=null?`<span>${r.totalPct}% of normal</span>`:''}</div></div>
+    ${r.plants.map(x=>`<div class="rep-p"><div><i class="dot" style="background:${pColor(x.code)}"></i><b>${esc(x.code)}</b> <small>${esc(x.name)}</small></div>
+      <div class="rep-v"><b class="num">${fmt(x.kwh,1)} kWh</b><span class="pill ${RST[x.status]||'none'}">${x.pct}% · ${esc(x.status)}</span></div>
+      <div class="rep-m">${esc(r.monthText)} so far: <b>${fmt(x.mtdKwh/1000,2)} MWh</b> (${x.mtdDays} days)${x.vsLastYearPct==null?'':` · <span style="color:${x.vsLastYearPct<0?'var(--bad)':'var(--good)'}">${x.vsLastYearPct>0?'+':''}${x.vsLastYearPct}% vs last year</span>`}</div></div>`).join('')}
+  </div>`;
+}
+function showReports(reps){
+  const m=document.createElement('div'); m.className='modal';
+  m.innerHTML=`<div class="card" style="max-width:460px">${reps.map(reportHtml).join('<div style="height:12px"></div>')}
+    <p style="color:var(--ink-3);font-size:12px;margin:12px 0 0">✓ Sent to boss${S.settings.telegramChatId?' (email + Telegram)':' (email)'} and the mobile app.</p>
+    <div class="toolbar mt"><button class="btn primary" id="repX">OK</button></div></div>`;
+  document.body.appendChild(m);
+  const close=()=>m.remove(); m.onclick=e=>{ if(e.target===m) close(); }; m.querySelector('#repX').onclick=close;
+}
+function renderRecent(){
+  const rows=[]; let k=S.today;
+  for(let i=0;i<20;i++){ rows.push(k); k=addDays(k,-1); }
+  $('#recent').innerHTML = `<thead><tr><th>Date</th>${plants().map(p=>`<th class="r">${esc(p.code)} kWh</th><th>${esc(p.code)} status</th>`).join('')}</tr></thead><tbody>`+
+    rows.map(k=>`<tr class="click" data-k="${k}"><td>${fd(k)}</td>${plants().map(p=>`<td class="r num">${fmt(S.data[p.code][k])}</td><td>${pill(statusOf(p.code,k))}</td>`).join('')}</tr>`).join('')+'</tbody>';
+  document.querySelectorAll('#recent tr[data-k]').forEach(tr=>tr.onclick=()=>{ $('#eDate').value=tr.dataset.k; renderEntry(); window.scrollTo({top:0,behavior:'smooth'}); });
+}
+
+/* ---- SOLARMAN export upload ---- */
+$('#uFile').onchange = e => { const f=e.target.files[0]; if(f) parseFile(f); e.target.value=''; };
+let UP=null;
+function toKey(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+  if(typeof v==='number' && v>30000 && v<80000){ const d=new Date(Math.round((v-25569)*86400000)); return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate()); }
+  const s=String(v).trim(); let m;
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return m[1]+'-'+pad(+m[2])+'-'+pad(+m[3]);
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))) return m[3]+'-'+pad(+m[2])+'-'+pad(+m[1]);
+  return null;
+}
+function parseFile(f){
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+      // find the header row
+      let hr=-1, dc=-1, vc=-1;
+      for(let r=0;r<Math.min(aoa.length,30);r++){
+        const row=aoa[r].map(x=>String(x).toLowerCase());
+        const d=row.findIndex(x=>/date|time|day|日期/.test(x));
+        let v=row.findIndex(x=>/(generation|yield|production|energy)/.test(x) && !/(power\b|kw$)/.test(x));
+        if(v<0) v=row.findIndex(x=>/kwh/.test(x));
+        if(d>=0 && v>=0){ hr=r; dc=d; vc=v; break; }
+      }
+      if(hr<0){ // fallback: first column dates, first numeric column
+        hr=-1; dc=0; vc=1;
+      }
+      UP={aoa,hr,dc,vc,name:f.name};
+      renderUpload();
+    }catch(err){ toast('Could not read file: '+err.message,true); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function renderUpload(){
+  if(!UP) return;
+  const {aoa,hr}=UP, head=hr>=0?aoa[hr]:aoa[0].map((_,i)=>'Column '+(i+1));
+  const opts=sel=>head.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${esc(h||('Column '+(i+1)))}</option>`).join('');
+  const unitMWh=/mwh/i.test(String(head[UP.vc]||''));
+  const code=$('#uPlant').value;
+  const rows=[];
+  aoa.slice(hr+1).forEach(r=>{ const k=toKey(r[UP.dc]); const v=parseFloat(String(r[UP.vc]).replace(/,/g,'')); if(k && !isNaN(v) && k<=S.today) rows.push({date:k,kwh:Math.round((unitMWh?v*1000:v)*10)/10}); });
+  UP.rows=rows;
+  $('#uPreview').innerHTML = `<div class="toolbar mt"><b>${esc(UP.name)}</b>
+    <label class="f" style="margin:0">Date column</label><select class="in" id="uDc" style="width:auto">${opts(UP.dc)}</select>
+    <label class="f" style="margin:0">Generation column</label><select class="in" id="uVc" style="width:auto">${opts(UP.vc)}</select></div>
+    ${rows.length?`<div class="tbl-wrap mt" style="max-height:320px;overflow:auto"><table class="t"><thead><tr><th>Date</th><th class="r">File kWh</th><th class="r">Currently in sheet</th><th>Status</th></tr></thead><tbody>
+      ${rows.map(r=>{ const old=S.data[code][r.date]; const same=old!=null&&Math.abs(old-r.kwh)<0.05; return `<tr><td>${fd(r.date)}</td><td class="r num">${fmt(r.kwh)}</td><td class="r num" style="color:${old==null?'var(--ink-3)':same?'var(--good)':'var(--warn)'}">${fmt(old)}</td><td>${same?'<span class="pill good">Same</span>':old==null?'<span class="pill none">New</span>':'<span class="pill warn">Update</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="toolbar mt"><button class="btn primary" id="uSave">Save ${rows.filter(r=>{const o=S.data[code][r.date];return o==null||Math.abs(o-r.kwh)>=0.05;}).length} entries to ${esc(code)}</button>${unitMWh?'<span class="pill warn">MWh converted to kWh</span>':''}</div>`
+    : '<div class="warnbox mt">No date/kWh found in these columns – pick the right columns above.</div>'}`;
+  $('#uDc').onchange=e=>{UP.dc=+e.target.value;renderUpload();};
+  $('#uVc').onchange=e=>{UP.vc=+e.target.value;renderUpload();};
+  const sb=$('#uSave'); if(sb) sb.onclick=async()=>{
+    const ch=UP.rows.filter(r=>{const o=S.data[code][r.date];return o==null||Math.abs(o-r.kwh)>=0.05;}).map(r=>({date:r.date,plant:code,kwh:r.kwh}));
+    if(!ch.length) return toast('Everything is already up to date');
+    await saveRows(ch,'upload '+UP.name); UP=null; $('#uPreview').innerHTML='';
+  };
+}
+$('#uPlant').onchange=()=>renderUpload();
+
+/* =================== ALERTS =================== */
+const TYPE = {
+  PLANT:{ic:'🔧',c:'bad',t:'Plant issue',a:a=>`Only ${a.plant} is low – get the plant checked (inverter / tripping / panel cleaning).`},
+  DOWN:{ic:'⛔',c:'bad',t:'Plant down / zero',a:a=>`${a.plant} production is zero – check immediately.`},
+  PENDING:{ic:'⏳',c:'warn',t:'Other plant entry pending',a:a=>`Other plant's data not entered yet – get ${a.plant} checked.`},
+  WEATHER:{ic:'☁',c:'wx',t:'Weather',a:()=>'All plants low – clouds/rain. No check needed.'},
+  CLEARED:{ic:'✓',c:'good',t:'Value corrected',a:()=>'Normal after the entry was updated.'}
+};
+function renderAlerts(){
+  const F=[['open','Open'],['plant','Plant issue'],['weather','Weather'],['all','All']];
+  $('#aFilter').innerHTML=F.map(([k,l])=>`<button class="${aFilter===k?'on':''}" data-f="${k}">${l}</button>`).join('');
+  document.querySelectorAll('#aFilter button').forEach(b=>b.onclick=()=>{aFilter=b.dataset.f;renderAlerts();});
+  let list=S.alerts.slice();
+  if(aFilter==='open') list=list.filter(a=>a.status==='Open'&&a.type!=='WEATHER'&&a.type!=='CLEARED');
+  if(aFilter==='plant') list=list.filter(a=>['PLANT','DOWN','PENDING'].includes(a.type));
+  if(aFilter==='weather') list=list.filter(a=>a.type==='WEATHER');
+  list=list.slice(0,150);
+  if(!list.length){ $('#aList').innerHTML=`<div class="empty-s">✓ ${aFilter==='open'?'No open alerts – all good':'No alerts'}</div>`; return; }
+  const edit=can('admin','boss');
+  $('#aList').innerHTML=list.map(a=>{
+    const T=TYPE[a.type]||TYPE.PLANT;
+    const bg={bad:'var(--bad-bg)',warn:'var(--warn-bg)',wx:'var(--wx-bg)',good:'var(--good-bg)'}[T.c];
+    const stc={Open:'bad','Technician Called':'warn',Resolved:'good','No Issue':'none',Closed:'none'}[a.status]||'none';
+    return `<div class="al"><div class="ic" style="background:${bg}">${T.ic}</div>
+      <div><div class="ttl"><i class="dot" style="background:${pColor(a.plant)}"></i>${esc(a.plant)} · ${fd(a.date)} ${a.severity==='URGENT'?'<span class="pill urgent">URGENT</span>':''}<span class="pill ${T.c}">${T.t}</span></div>
+      <div class="meta num">${fmt(a.kwh)} kWh · normal ~${fmt(a.normal,0)} · <b style="color:var(--bad)">${a.drop}% below normal</b></div>
+      <div class="act">➡️ ${esc(T.a(a))}</div>
+      ${a.remark?`<div class="rm">📝 ${esc(a.remark)}</div>`:''}
+      ${a.updatedBy?`<div class="rm">${esc(a.updatedBy)} · ${esc(a.updatedAt)}${a.notified==='Y'?' · ✉ sent to boss':''}</div>`:''}
+      ${edit&&a.type!=='CLEARED'?`<div class="ctl"><select class="in" data-k="${a.key}">${['Open','Technician Called','Resolved','No Issue'].map(s=>`<option ${s===a.status?'selected':''}>${s}</option>`).join('')}</select>
+        <input class="in" placeholder="Remark (e.g. inverter tripped, reset done)" value="${esc(a.remark)}" data-r="${a.key}"><button class="btn sm dark" data-s="${a.key}">Save</button></div>`:''}
+      </div><div><span class="pill ${stc}">${esc(a.status)}</span></div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-s]').forEach(b=>b.onclick=async()=>{
+    const k=b.dataset.s; busy(true);
+    try{ S.alerts=await call('updateAlert',{key:k,status:document.querySelector(`select[data-k="${k}"]`).value,remark:document.querySelector(`input[data-r="${k}"]`).value}); toast('Alert updated'); buildNav(); renderAlerts(); }
+    catch(e){toast(e.message,true);} busy(false);
+  });
+}
+
+/* =================== REPORTS =================== */
+function years(){ const s=new Set(); plants().forEach(p=>Object.keys(S.data[p.code]).forEach(k=>s.add(+k.slice(0,4)))); s.add(+S.today.slice(0,4)); return [...s].sort((a,b)=>b-a); }
+function renderReports(){
+  const ys=years();
+  if(!$('#rYear').options.length || $('#rYear').options.length!==ys.length) $('#rYear').innerHTML=ys.map(y=>`<option>${y}</option>`).join('');
+  if(!$('#rMonth').value) $('#rMonth').value=addDays(S.today.slice(0,7)+'-01',-1).slice(0,7);
+  $('#rMailBox').classList.toggle('hidden',!can('admin','boss'));
+  const Y=+$('#rYear').value||ys[0];
+  // Summary (year-wise, like Summery sheet)
+  $('#rSummary').innerHTML=`<h3>Summary – year-wise total <span class="sub">MWh</span></h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Year</th>${plants().map(p=>`<th class="r">${esc(p.code)} MWh</th><th class="r">Months</th><th class="r">kWh/kW/day</th>`).join('')}<th class="r">Total MWh</th></tr></thead><tbody>
+    ${ys.slice().reverse().map(y=>{ let tot=0; return `<tr ${y===Y?'style="font-weight:700"':''}><td>${y}</td>${plants().map(p=>{ const e=Object.entries(S.data[p.code]).filter(([k])=>+k.slice(0,4)===y); const t=e.reduce((a,[,v])=>a+v,0); tot+=t; const ms=new Set(e.map(([k])=>k.slice(5,7))).size; return `<td class="r num">${e.length?fmt(t/1000,2):'—'}</td><td class="r num">${ms||'—'}</td><td class="r num">${e.length?fmt(t/(p.capacityKw*e.length),2):'—'}</td>`; }).join('')}<td class="r num">${fmt(tot/1000,2)}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+  // per plant monthly + daily
+  $('#rPlants').innerHTML=plants().map(p=>{
+    let mrow='', tot=0, cnt=0;
+    const cells=MON.map((_,i)=>{ const a=sumMonth(p.code,Y+'-'+pad(i+1)); if(a.n){tot+=a.t;cnt++;} return a.n?a.t/1000:null; });
+    // daily grid
+    let daily=`<thead><tr><th>Day</th>${MON.map(m=>`<th class="r">${m}</th>`).join('')}</tr></thead><tbody>`;
+    for(let d=1;d<=31;d++){ daily+=`<tr><td>${d}</td>`+MON.map((_,i)=>{ if(d>dim(Y,i+1)) return '<td></td>'; const k=Y+'-'+pad(i+1)+'-'+pad(d), v=S.data[p.code][k]; const st=v==null?'none':statusOf(p.code,k); const c={bad:'color:var(--bad);font-weight:700',wx:'color:var(--wx)',warn:'color:var(--warn)'}[st]||''; return `<td class="r num" style="${c}">${v==null?'':fmt(v)}</td>`; }).join('')+'</tr>'; }
+    daily+=`<tr class="tot"><td>Total kWh</td>${cells.map(c=>`<td class="r num">${c==null?'':fmt(c*1000,1)}</td>`).join('')}</tr>`;
+    daily+=`<tr class="tot"><td>Total MWh</td>${cells.map(c=>`<td class="r num">${c==null?'':fmt(c,2)}</td>`).join('')}</tr></tbody>`;
+    return `<div class="card mt"><h3><span style="display:flex;gap:6px;align-items:center"><i class="dot" style="background:${pColor(p.code)}"></i>${esc(p.name)} – ${Y}</span>
+      <span class="sub">Total ${fmt(tot/1000,2)} MWh · Avg/month ${cnt?fmt(tot/1000/cnt,2):'—'} · ${p.capacityKw} kW</span></h3>
+      <div class="tbl-wrap"><table class="t">${daily}</table></div></div>`;
+  }).join('');
+}
+$('#rYear').onchange=renderReports;
+$('#rPrint').onclick=()=>{ $('#p-reports').classList.add('printme'); window.print(); setTimeout(()=>$('#p-reports').classList.remove('printme'),500); };
+$('#rMail').onclick=async()=>{ const m=$('#rMonth').value; if(!m) return; busy(true); try{ await call('emailMonth',{month:m}); toast(monName(m)+' report emailed'); }catch(e){toast(e.message,true);} busy(false); };
+$('#rXls').onclick=()=>{
+  const Y=+$('#rYear').value; const wb=XLSX.utils.book_new();
+  plants().forEach(p=>{
+    const aoa=[[p.code+' -'+Y],['Days',...MON.map(m=>m.toUpperCase())]];
+    for(let d=1;d<=31;d++) aoa.push([d,...MON.map((_,i)=>{ const v=S.data[p.code][Y+'-'+pad(i+1)+'-'+pad(d)]; return v==null?'':v; })]);
+    const tk=MON.map((_,i)=>sumMonth(p.code,Y+'-'+pad(i+1)).t);
+    aoa.push(['Total KWH',...tk.map(v=>Math.round(v*10)/10)]); aoa.push(['Total MWH',...tk.map(v=>Math.round(v)/1000)]);
+    const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:11},...MON.map(()=>({wch:9}))];
+    XLSX.utils.book_append_sheet(wb,ws,(p.code+' Daily '+Y).slice(0,31));
+  });
+  const ys=years().slice().reverse();
+  plants().forEach(p=>{
+    const aoa=[[p.name],['PRODUCTION IN MWH',...MON.map(m=>m.toUpperCase()),'TOTAL','AVERAGE PER MONTH','KWH/KW/DAY']];
+    ys.forEach(y=>{ const c=MON.map((_,i)=>{const a=sumMonth(p.code,y+'-'+pad(i+1));return a.n?Math.round(a.t)/1000:'';}); const n=c.filter(x=>x!=='').length; const t=c.reduce((a,b)=>a+(+b||0),0); const days=Object.keys(S.data[p.code]).filter(k=>+k.slice(0,4)===y).length;
+      aoa.push(['YEAR '+y,...c,Math.round(t*1000)/1000,n?Math.round(t/n*1000)/1000:'',days?Math.round(t*1000/(p.capacityKw*days)*100)/100:'']); });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),(p.code+' Monthly').slice(0,31));
+  });
+  XLSX.writeFile(wb,'Solar_Production_'+Y+'.xlsx');
+};
+
+/* =================== SETTINGS =================== */
+let PL=[];
+function renderSettings(){
+  const s=S.settings;
+  $('#sCompany').value=s.companyName||''; $('#sTh').value=s.thresholdPct; $('#sUrg').value=s.urgentDays;
+  $('#sBoss').value=s.bossEmails||''; $('#sRem').value=s.reminderEmails||''; $('#sHour').value=s.dailyCheckHour;
+  $('#sWx').value=String(!!s.alertOnWeather); $('#sRep').value=String(s.dailyReport!==false); $('#sTgT').value=s.telegramToken||''; $('#sTgC').value=s.telegramChatId||''; $('#sFcm').value=s.fcmProjectId||'';
+  $('#sUrl').value=S.appUrl||'(link appears here after deployment)';
+  PL=JSON.parse(JSON.stringify(s.plants)); renderPlantsEd(); renderUsers();
+  let dl=document.getElementById('sheetList'); if(!dl){ dl=document.createElement('datalist'); dl.id='sheetList'; document.body.appendChild(dl); }
+  dl.innerHTML=(S.sheetNames||[]).map(n=>`<option value="${esc(n)}">`).join('');
+  $('#sLinked').innerHTML=`Linked: <b>${esc(S.spreadsheetName||'—')}</b><br>`+(S.plantStatus||[]).map(x=> x.sheet&&x.years.length
+    ? `<span class="pill good">✓ ${esc(x.code)}</span> tab "${esc(x.sheet)}" · years ${x.years.join(', ')}`
+    : `<span class="pill bad">✕ ${esc(x.code)}</span> no daily tab with "${esc(x.code)} -YYYY" blocks`).join('<br>')+
+    (S.sheetNames&&S.sheetNames.length?`<div style="color:var(--ink-3);margin-top:6px">Tabs in this file: ${S.sheetNames.map(esc).join(' · ')}</div>`:'');
+}
+function renderPlantsEd(){
+  $('#sPlants').innerHTML=PL.map((p,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px">
+    <div class="grid g3">
+      <div><label class="f">Code</label><input class="in" data-i="${i}" data-k="code" value="${esc(p.code)}"></div>
+      <div><label class="f">Capacity (kW)</label><input class="in" type="number" data-i="${i}" data-k="capacityKw" value="${p.capacityKw}"></div>
+      <div><label class="f">Block title tag</label><input class="in" data-i="${i}" data-k="tag" value="${esc(p.tag||p.code)}" title="Year block title in sheet, e.g. 'BPI -2026'"></div>
+    </div>
+    <label class="f">Plant name</label><input class="in" data-i="${i}" data-k="name" value="${esc(p.name)}">
+    <div class="grid g2"><div><label class="f">Daily sheet tab</label><input class="in" list="sheetList" data-i="${i}" data-k="dailySheet" value="${esc(p.dailySheet)}"></div>
+    <div><label class="f">Monthly sheet tab</label><input class="in" list="sheetList" data-i="${i}" data-k="monthlySheet" value="${esc(p.monthlySheet||'')}"></div></div>
+    ${PL.length>1?`<button class="btn sm mt" data-del="${i}" style="color:var(--bad)">Remove</button>`:''}</div>`).join('');
+  document.querySelectorAll('#sPlants input').forEach(el=>el.oninput=()=>{ PL[+el.dataset.i][el.dataset.k]= el.dataset.k==='capacityKw'? +el.value : el.value.trim(); });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ PL.splice(+b.dataset.del,1); renderPlantsEd(); });
+}
+$('#sAddPlant').onclick=()=>{ PL.push({code:'NEW',name:'New plant',capacityKw:50,dailySheet:'',monthlySheet:'',tag:'NEW'}); renderPlantsEd(); };
+$('#sSave').onclick=async()=>{
+  busy(true);
+  try{
+    S.settings=await call('saveSettings',{companyName:$('#sCompany').value.trim(),thresholdPct:+$('#sTh').value,urgentDays:+$('#sUrg').value,bossEmails:$('#sBoss').value.trim(),reminderEmails:$('#sRem').value.trim(),dailyCheckHour:+$('#sHour').value,alertOnWeather:$('#sWx').value==='true',dailyReport:$('#sRep').value==='true',telegramToken:$('#sTgT').value.trim(),telegramChatId:$('#sTgC').value.trim(),fcmProjectId:$('#sFcm').value.trim(),plants:PL});
+    toast('Settings saved'); busy(false); await boot(); go('settings'); return;
+  }catch(e){toast(e.message,true);} busy(false);
+};
+$('#sPush').onclick=async()=>{ busy(true); try{ const r=await call('testPush'); toast(`Test alarm sent to ${r.sent} phone${r.sent===1?'':'s'}`); }catch(e){ toast(e.message,true); } busy(false); };
+$('#sLink').onclick=async()=>{ const u=$('#sSheetUrl').value.trim(); if(!u) return toast('Paste the Google Sheet URL',true); busy(true); try{ const r=await call('linkSheet',{url:u}); toast('Linked: '+r.name); $('#sSheetUrl').value=''; busy(false); await boot(); go('settings'); return; }catch(e){toast(e.message,true);} busy(false); };
+$('#sTest').onclick=async()=>{ busy(true); try{ await call('testEmail'); toast('Test email sent'); }catch(e){toast(e.message,true);} busy(false); };
+$('#sTrig').onclick=async()=>{ busy(true); try{ await call('installTriggers'); toast('Daily check trigger set'); }catch(e){toast(e.message,true);} busy(false); };
+$('#sRebuild').onclick=async()=>{ busy(true); try{ S.alerts=await call('rebuildAlerts',{days:60}); buildNav(); toast('Alerts built (no emails sent)'); }catch(e){toast(e.message,true);} busy(false); };
+$('#sCopy').onclick=()=>{ const i=$('#sUrl'); i.select(); try{ navigator.clipboard.writeText(i.value); }catch(e){ document.execCommand('copy'); } toast('Link copied'); };
+function renderUsers(){
+  $('#uTable').innerHTML='<thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Active</th><th></th></tr></thead><tbody>'+
+    (S.users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td>${esc(u.name)}</td><td><span class="pill ${u.role==='admin'?'warn':u.role==='boss'?'wx':'none'}">${u.role}</span></td><td>${u.active?'✓':'✕'}</td>
+    <td class="r"><button class="btn sm" data-eu="${esc(u.username)}">Edit</button> ${u.username!==S.user.username?`<button class="btn sm" data-du="${esc(u.username)}" style="color:var(--bad)">Delete</button>`:''}</td></tr>`).join('')+'</tbody>';
+  document.querySelectorAll('[data-eu]').forEach(b=>b.onclick=()=>{ const u=S.users.find(x=>x.username===b.dataset.eu); $('#nuU').value=u.username; $('#nuN').value=u.name; $('#nuR').value=u.role; $('#nuP').value=''; $('#nuU').focus(); });
+  document.querySelectorAll('[data-du]').forEach(b=>b.onclick=async()=>{ if(!confirm('Delete '+b.dataset.du+'?')) return; busy(true); try{ S.users=await call('deleteUser',{username:b.dataset.du}); renderUsers(); toast('User deleted'); }catch(e){toast(e.message,true);} busy(false); });
+}
+$('#nuSave').onclick=async()=>{ busy(true); try{ S.users=await call('saveUser',{username:$('#nuU').value.trim(),name:$('#nuN').value.trim(),role:$('#nuR').value,password:$('#nuP').value}); ['#nuU','#nuN','#nuP'].forEach(s=>$(s).value=''); renderUsers(); toast('User saved'); }catch(e){toast(e.message,true);} busy(false); };
+
+/* =================== START =================== */
+window.addEventListener('resize',()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(S && page==='dash') Object.values(charts).forEach(c=>c.resize()); },200); });
+TOKEN=window.SPM_BOOT_TOKEN||store.get('spm_token');
+if(window.SPM_BOOT_TOKEN) store.set('spm_token',TOKEN);
+if(TOKEN) boot(); else $('#login').classList.remove('hidden');
+</script>
+</body>
+</html>
