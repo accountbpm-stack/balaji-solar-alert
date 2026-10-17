@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS = {
   dailyCheckHour: 19,      // daily check time (24h)
   telegramToken: '',
   telegramChatId: '',
-  fcmProjectId: ''         // Firebase project ID – instant push to the Android app
+  fcmProjectId: 'balaji-solar-alert'   // Firebase project ID – instant push to the Android app
 };
 
 /* ============================ ENTRY POINTS ============================ */
