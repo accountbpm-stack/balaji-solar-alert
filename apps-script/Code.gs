@@ -292,7 +292,15 @@ function findSheet_(name) {
 }
 
 /** Plant's daily sheet: by name first, otherwise any tab that has "<TAG> -YYYY" year blocks. */
+let PS_CACHE_ = {};
 function plantSheet_(p) {
+  const ck = p.code + '|' + p.dailySheet + '|' + p.tag;
+  if (PS_CACHE_[ck]) return PS_CACHE_[ck];
+  const sh = plantSheet0_(p);
+  if (sh) PS_CACHE_[ck] = sh;
+  return sh;
+}
+function plantSheet0_(p) {
   const byName = findSheet_(p.dailySheet);
   if (byName && Object.keys(blocks_(byName, p.tag)).length) return byName;
   const auto = ss_().getSheets().find(sh => sh.getName().indexOf('SPM_') !== 0 && Object.keys(blocks_(sh, p.tag)).length);
@@ -334,8 +342,14 @@ function ensureSheets_() {
   ENSURED_ = true;
 }
 
-/** Year blocks in a daily sheet: { 2023: titleRow, 2024: ... } */
+/** Year blocks in a daily sheet: { 2023: titleRow, 2024: ... } (cached for this run) */
+let BLK_CACHE_ = {};
 function blocks_(sh, tag) {
+  const ck = sh.getSheetId() + '|' + tag;
+  if (BLK_CACHE_[ck]) return BLK_CACHE_[ck];
+  return (BLK_CACHE_[ck] = blocks0_(sh, tag));
+}
+function blocks0_(sh, tag) {
   const last = sh.getLastRow();
   if (!last) return {};
   const colA = sh.getRange(1, 1, Math.min(last, 3000), 1).getDisplayValues();
@@ -407,6 +421,7 @@ function createYearBlock_(sh, plant, year) {
       msh.getRange(idx + 1, 2, 1, 12).setFormulas([f]);
     }
   }
+  BLK_CACHE_ = {};
   log_('system', 'createYearBlock', plant.code + ' ' + year);
 }
 
@@ -417,7 +432,7 @@ function linkSheet_(url, user) {
   let ss;
   try { ss = SpreadsheetApp.openById(id); } catch (e) { throw new Error('Cannot open that sheet – check the URL and that this Google account has edit access'); }
   PropertiesService.getScriptProperties().setProperty('REPORT_SS_ID', id);
-  SS_CACHE_ = ss; ENSURED_ = false;
+  SS_CACHE_ = ss; ENSURED_ = false; BLK_CACHE_ = {}; PS_CACHE_ = {};
   ensureSheets_();
   log_(user.username, 'linkSheet', ss.getName());
   return { name: ss.getName() };

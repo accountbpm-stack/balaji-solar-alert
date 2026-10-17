@@ -279,13 +279,14 @@ nav.bottom{display:none}
       </div>
 
       <div class="card mt">
-        <h3>SOLARMAN export upload <span class="sub">enter a full month at once</span></h3>
+        <h3>SOLARMAN export upload <span class="sub">checks every date in the file and updates only what changed</span></h3>
         <div class="toolbar" style="margin-bottom:10px">
           <label class="f" style="margin:0">Plant</label>
           <select class="in" id="uPlant" style="width:auto"></select>
+          <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2)"><input type="checkbox" id="uToday"> Include today (only if the day is over)</label>
         </div>
-        <label class="drop" id="uDrop"><input type="file" id="uFile" accept=".xlsx,.xls,.csv" hidden>
-          <b>Choose Excel / CSV file</b><br><small>Portal → Export → Daily data (Month/Year)</small></label>
+        <label class="drop" id="uDrop"><input type="file" id="uFile" accept=".xlsx,.xls,.csv" multiple hidden>
+          <b>Choose Excel / CSV file(s)</b> – BPI and SBP together is fine<br><small>Portal → Export → Daily data (Month/Year)</small></label>
         <div id="uPreview"></div>
       </div>
 
@@ -629,7 +630,9 @@ function renderEntry(){
   liveHints();
   const has = plants().some(p=>S.data[p.code][k]!=null);
   $('#eNote').textContent = has ? 'Entry already exists for this date – saving will update it' : '';
-  $('#uPlant').innerHTML = plants().map(p=>`<option value="${p.code}">${esc(p.code)} – ${esc(p.name)}</option>`).join('');
+  const up=$('#uPlant').value||'auto';
+  $('#uPlant').innerHTML = '<option value="auto">Auto-detect from file</option>'+plants().map(p=>`<option value="${p.code}">${esc(p.code)} – ${esc(p.name)}</option>`).join('');
+  $('#uPlant').value=up;
   renderRecent();
 }
 function liveHints(){
@@ -698,8 +701,8 @@ function renderRecent(){
 }
 
 /* ---- SOLARMAN export upload ---- */
-$('#uFile').onchange = e => { const f=e.target.files[0]; if(f) parseFile(f); e.target.value=''; };
-let UP=null;
+$('#uFile').onchange = e => { const fs=[...e.target.files]; e.target.value=''; if(!fs.length) return; UP=[]; Promise.all(fs.map(parseFile)).then(()=>renderUpload()); };
+let UP=[];
 function toKey(v){
   if(v==null||v==='') return null;
   if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
@@ -709,57 +712,88 @@ function toKey(v){
   if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))) return m[3]+'-'+pad(+m[2])+'-'+pad(+m[1]);
   return null;
 }
+/** Which plant is this file for? Looks at the file name and the first rows (plant code / name). */
+function detectPlant(name, aoa){
+  const txt=(name+' '+aoa.slice(0,15).map(r=>r.join(' ')).join(' ')).toUpperCase().replace(/[._\-]+/g,' ');
+  const hits=plants().filter(p=>{
+    const keys=[p.code,p.tag,p.name].filter(Boolean).map(k=>String(k).toUpperCase().replace(/[._\-]+/g,' ').trim());
+    return keys.some(k=>k && new RegExp('(^|[^A-Z])'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^A-Z]|$)').test(txt));
+  });
+  return hits.length===1 ? hits[0].code : '';
+}
 function parseFile(f){
-  const rd=new FileReader();
-  rd.onload=ev=>{
-    try{
-      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
-      // find the header row
-      let hr=-1, dc=-1, vc=-1;
-      for(let r=0;r<Math.min(aoa.length,30);r++){
-        const row=aoa[r].map(x=>String(x).toLowerCase());
-        const d=row.findIndex(x=>/date|time|day|日期/.test(x));
-        let v=row.findIndex(x=>/(generation|yield|production|energy)/.test(x) && !/(power\b|kw$)/.test(x));
-        if(v<0) v=row.findIndex(x=>/kwh/.test(x));
-        if(d>=0 && v>=0){ hr=r; dc=d; vc=v; break; }
-      }
-      if(hr<0){ // fallback: first column dates, first numeric column
-        hr=-1; dc=0; vc=1;
-      }
-      UP={aoa,hr,dc,vc,name:f.name};
-      renderUpload();
-    }catch(err){ toast('Could not read file: '+err.message,true); }
-  };
-  rd.readAsArrayBuffer(f);
+  return new Promise(res=>{
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+        let hr=-1, dc=0, vc=1;
+        for(let r=0;r<Math.min(aoa.length,30);r++){
+          const row=aoa[r].map(x=>String(x).toLowerCase());
+          const d=row.findIndex(x=>/date|time|day|日期/.test(x));
+          let v=row.findIndex(x=>/(generation|yield|production|energy)/.test(x) && !/(power\b|kw$)/.test(x));
+          if(v<0) v=row.findIndex(x=>/kwh/.test(x));
+          if(d>=0 && v>=0){ hr=r; dc=d; vc=v; break; }
+        }
+        const sel=$('#uPlant').value; UP.push({aoa,hr,dc,vc,name:f.name,plant:(sel&&sel!=='auto')?sel:detectPlant(f.name,aoa)});
+      }catch(err){ toast('Could not read '+f.name+': '+err.message,true); }
+      res();
+    };
+    rd.onerror=()=>{ toast('Could not read '+f.name,true); res(); };
+    rd.readAsArrayBuffer(f);
+  });
+}
+function uploadRows(F){
+  const head=F.hr>=0?F.aoa[F.hr]:[];
+  const unitMWh=/mwh/i.test(String(head[F.vc]||''));
+  const incToday=$('#uToday').checked;
+  const rows=[];
+  F.aoa.slice(F.hr+1).forEach(r=>{ const k=toKey(r[F.dc]); const v=parseFloat(String(r[F.vc]).replace(/,/g,''));
+    if(k && !isNaN(v) && (k<S.today || (incToday && k===S.today))) rows.push({date:k,kwh:Math.round((unitMWh?v*1000:v)*10)/10}); });
+  const code=F.plant;
+  const changes=[]; let same=0;
+  if(code) rows.forEach(r=>{ const old=S.data[code][r.date]; if(old!=null && Math.abs(old-r.kwh)<0.05) same++; else changes.push({date:r.date,plant:code,kwh:r.kwh,old:old}); });
+  return {rows,changes,same,code,unitMWh,head};
 }
 function renderUpload(){
-  if(!UP) return;
-  const {aoa,hr}=UP, head=hr>=0?aoa[hr]:aoa[0].map((_,i)=>'Column '+(i+1));
-  const opts=sel=>head.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${esc(h||('Column '+(i+1)))}</option>`).join('');
-  const unitMWh=/mwh/i.test(String(head[UP.vc]||''));
-  const code=$('#uPlant').value;
-  const rows=[];
-  aoa.slice(hr+1).forEach(r=>{ const k=toKey(r[UP.dc]); const v=parseFloat(String(r[UP.vc]).replace(/,/g,'')); if(k && !isNaN(v) && k<=S.today) rows.push({date:k,kwh:Math.round((unitMWh?v*1000:v)*10)/10}); });
-  UP.rows=rows;
-  $('#uPreview').innerHTML = `<div class="toolbar mt"><b>${esc(UP.name)}</b>
-    <label class="f" style="margin:0">Date column</label><select class="in" id="uDc" style="width:auto">${opts(UP.dc)}</select>
-    <label class="f" style="margin:0">Generation column</label><select class="in" id="uVc" style="width:auto">${opts(UP.vc)}</select></div>
-    ${rows.length?`<div class="tbl-wrap mt" style="max-height:320px;overflow:auto"><table class="t"><thead><tr><th>Date</th><th class="r">File kWh</th><th class="r">Currently in sheet</th><th>Status</th></tr></thead><tbody>
-      ${rows.map(r=>{ const old=S.data[code][r.date]; const same=old!=null&&Math.abs(old-r.kwh)<0.05; return `<tr><td>${fd(r.date)}</td><td class="r num">${fmt(r.kwh)}</td><td class="r num" style="color:${old==null?'var(--ink-3)':same?'var(--good)':'var(--warn)'}">${fmt(old)}</td><td>${same?'<span class="pill good">Same</span>':old==null?'<span class="pill none">New</span>':'<span class="pill warn">Update</span>'}</td></tr>`; }).join('')}
-    </tbody></table></div>
-    <div class="toolbar mt"><button class="btn primary" id="uSave">Save ${rows.filter(r=>{const o=S.data[code][r.date];return o==null||Math.abs(o-r.kwh)>=0.05;}).length} entries to ${esc(code)}</button>${unitMWh?'<span class="pill warn">MWh converted to kWh</span>':''}</div>`
-    : '<div class="warnbox mt">No date/kWh found in these columns – pick the right columns above.</div>'}`;
-  $('#uDc').onchange=e=>{UP.dc=+e.target.value;renderUpload();};
-  $('#uVc').onchange=e=>{UP.vc=+e.target.value;renderUpload();};
+  if(!UP.length){ $('#uPreview').innerHTML=''; return; }
+  let all=[];
+  const blocks=UP.map((F,i)=>{
+    const R=uploadRows(F); all=all.concat(R.changes);
+    const opts=sel=>(R.head.length?R.head:(F.aoa[0]||[]).map((_,j)=>'Column '+(j+1))).map((h,j)=>`<option value="${j}" ${j===sel?'selected':''}>${esc(h||('Column '+(j+1)))}</option>`).join('');
+    const dates=R.rows.map(r=>r.date).sort();
+    const nNew=R.changes.filter(c=>c.old==null).length, nUpd=R.changes.length-nNew;
+    return `<div class="card mt" style="padding:12px">
+      <div class="toolbar"><b>📄 ${esc(F.name)}</b>
+        <label class="f" style="margin:0">Plant</label><select class="in" data-up="${i}" data-k="plant" style="width:auto"><option value="">– choose –</option>${plants().map(p=>`<option value="${p.code}" ${p.code===R.code?'selected':''}>${esc(p.code)}</option>`).join('')}</select>
+        <label class="f" style="margin:0">Date col</label><select class="in" data-up="${i}" data-k="dc" style="width:auto">${opts(F.dc)}</select>
+        <label class="f" style="margin:0">kWh col</label><select class="in" data-up="${i}" data-k="vc" style="width:auto">${opts(F.vc)}</select>
+        ${R.unitMWh?'<span class="pill warn">MWh → kWh</span>':''}</div>
+      ${!R.code?'<div class="warnbox mt">Could not tell which plant this file is for – choose the plant above.</div>'
+        : !R.rows.length?'<div class="warnbox mt">No date/kWh found – pick the right columns above.</div>'
+        : `<div style="margin-top:8px;font-size:13px;color:var(--ink-2)">${R.rows.length} days checked (${fds(dates[0])} → ${fds(dates[dates.length-1])}) ·
+            <span class="pill none">${nNew} new</span> <span class="pill warn">${nUpd} changed</span> <span class="pill good">${R.same} same</span></div>
+           ${R.changes.length?`<div class="tbl-wrap mt" style="max-height:260px;overflow:auto"><table class="t"><thead><tr><th>Date</th><th class="r">In sheet now</th><th class="r">From file</th><th></th></tr></thead><tbody>
+             ${R.changes.map(c=>`<tr><td>${fd(c.date)}</td><td class="r num" style="color:var(--ink-3)">${fmt(c.old)}</td><td class="r num"><b>${fmt(c.kwh)}</b></td><td>${c.old==null?'<span class="pill none">New</span>':'<span class="pill warn">Update</span>'}</td></tr>`).join('')}
+           </tbody></table></div>`:''}`}
+    </div>`;
+  }).join('');
+  $('#uPreview').innerHTML = blocks + `<div class="toolbar mt">${all.length
+      ? `<button class="btn primary" id="uSave">Update ${all.length} entr${all.length===1?'y':'ies'}</button>`
+      : '<span class="pill good">✓ Everything in the file(s) already matches the sheet</span>'}
+    <button class="btn" id="uClear">Clear</button>
+    ${$('#uToday').checked?'':'<span style="font-size:12px;color:var(--ink-3)">Today ('+fds(S.today)+') is skipped – the day is not complete yet</span>'}</div>`;
+  document.querySelectorAll('#uPreview select[data-up]').forEach(el=>el.onchange=()=>{ const F=UP[+el.dataset.up]; F[el.dataset.k]=el.dataset.k==='plant'?el.value:+el.value; renderUpload(); });
+  $('#uClear').onclick=()=>{ UP=[]; renderUpload(); };
   const sb=$('#uSave'); if(sb) sb.onclick=async()=>{
-    const ch=UP.rows.filter(r=>{const o=S.data[code][r.date];return o==null||Math.abs(o-r.kwh)>=0.05;}).map(r=>({date:r.date,plant:code,kwh:r.kwh}));
-    if(!ch.length) return toast('Everything is already up to date');
-    await saveRows(ch,'upload '+UP.name); UP=null; $('#uPreview').innerHTML='';
+    const rows=all.map(c=>({date:c.date,plant:c.plant,kwh:c.kwh}));
+    await saveRows(rows,'upload '+UP.map(F=>F.name).join(', ')); UP=[]; renderUpload();
   };
 }
-$('#uPlant').onchange=()=>renderUpload();
+$('#uPlant').onchange=()=>{ if($('#uPlant').value!=='auto') UP.forEach(F=>F.plant=$('#uPlant').value); renderUpload(); };
+$('#uToday').onchange=()=>renderUpload();
 
 /* =================== ALERTS =================== */
 const TYPE = {
