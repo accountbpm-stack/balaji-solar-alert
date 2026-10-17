@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "91859461428",
+    "project_id": "balaji-solar-alert",
+    "storage_bucket": "balaji-solar-alert.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:91859461428:android:7d831477a7c3753a5c3161",
+        "android_client_info": {
+          "package_name": "com.balajigroup.solaralert"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEz70iVvtMzXCPeJY8QPj_01l0sm_M1YM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
